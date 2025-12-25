@@ -2,20 +2,14 @@ name: Build APK
 on: [push, pull_request]
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Dependencies
+      - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libtinfo5 python3-pip
-          pip3 install --user --upgrade buildozer
-
-      - name: Install Android Tools Manually
-        run: |
-          # התקנה ידנית של הכלים שחסרו בתמונה שלך
-          yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT "build-tools;34.0.0" "platforms;android-34" "platform-tools"
+          sudo apt-get install -y libtinfo5
 
       - name: Build with Buildozer
         uses: digreatbrian/buildozer-action@v2
