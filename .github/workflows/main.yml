@@ -9,12 +9,15 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libtinfo5
+          sudo apt-get install -y libtinfo5 python3-pip
+          pip3 install --user --upgrade buildozer
+
+      - name: Install Android Tools Manually
+        run: |
+          # התקנה ידנית של הכלים שחסרו בתמונה שלך
+          yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT "build-tools;34.0.0" "platforms;android-34" "platform-tools"
 
       - name: Build with Buildozer
         uses: digreatbrian/buildozer-action@v2
         with:
           buildozer_version: stable
-        env:
-          # זה השלב שפותר את השגיאה מהתמונה האחרונה
-          ANDROID_SDK_TOOLS_REV: "34.0.0"
