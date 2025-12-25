@@ -1,0 +1,206 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Kahoot Bot App (Kivy)
+
+A self‑contained script that contains both the Kivy UI and the bot logic.
+It can be dropped into a Buildozer project and compiled to an APK.
+
+Features:
+    • TextInput for 6‑digit Game PIN
+    • TextInput for number of bots
+    • START button that spawns bots using requests
+    • Random funny nicknames & rotating User‑Agents
+"""
+
+import random
+from datetime import datetime
+
+import requests
+from kivy.app import App
+from kivy.clock import Clock
+from kivy.lang import Builder
+from kivy.properties import NumericProperty, StringProperty
+from kivy.uix.boxlayout import BoxLayout
+
+
+# ------------------------------------------------------------------
+# KV UI definition
+# ------------------------------------------------------------------
+KV = """
+<MainScreen>:
+    orientation: "vertical"
+    padding: dp(20)
+    spacing: dp(15)
+
+    Label:
+        text: "Kahoot Bot App"
+        font_size: "24sp"
+        size_hint_y: None
+        height: self.texture_size[1]
+
+    BoxLayout:
+        orientation: "horizontal"
+        size_hint_y: None
+        height: dp(40)
+        spacing: dp(10)
+
+        Label:
+            text: "Game PIN:"
+            size_hint_x: 0.3
+
+        TextInput:
+            id: pin_input
+            multiline: False
+            input_filter: "int"
+            hint_text: "123456"
+            write_tab: False
+            on_text_validate: root.start_bots()
+            text: root.game_pin
+
+    BoxLayout:
+        orientation: "horizontal"
+        size_hint_y: None
+        height: dp(40)
+        spacing: dp(10)
+
+        Label:
+            text: "Bots:"
+            size_hint_x: 0.3
+
+        TextInput:
+            id: bots_input
+            multiline: False
+            input_filter: "int"
+            hint_text: "5"
+            write_tab: False
+            on_text_validate: root.start_bots()
+            text: str(root.num_bots)
+
+    Button:
+        text: root.button_text
+        font_size: "18sp"
+        size_hint_y: None
+        height: dp(50)
+        on_release: root.start_bots()
+
+    Label:
+        id: status_lbl
+        text: root.status_msg
+        halign: "center"
+        valign: "middle"
+        size_hint_y: None
+        height: self.texture_size[1]
+"""
+
+
+# ------------------------------------------------------------------
+# Random nickname & User‑Agent helpers
+# ------------------------------------------------------------------
+FUNNY_NAMES = [
+    "SirLaughALot", "CheesyChickens", "CaptainBanana",
+    "PandaMonium", "NinjaNoodle", "GlitterGiraffe",
+    "MightyMouse", "DancingDonut", "PixelPirate",
+    "QuantumQuokka"
+]
+
+USER_AGENTS = [
+    ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.6668.60 Safari/537.36"),
+    ("Mozilla/5.0 (Macintosh; Intel Mac OS X 13_6_7) "
+     "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15"),
+    ("Mozilla/5.0 (iPhone; CPU iPhone OS 17_2_1 like Mac OS X) "
+     "AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/19C79"),
+    ("Dalvik/2.1.0 (Linux; U; Android 13; Pixel 6 Build/TQ3A.230705.001)")
+]
+
+def random_nickname() -> str:
+    return f"{random.choice(FUNNY_NAMES)}{random.randint(100,999)}"
+
+def random_user_agent() -> str:
+    return random.choice(USER_AGENTS)
+
+
+# ------------------------------------------------------------------
+# Bot logic – join a Kahoot game
+# ------------------------------------------------------------------
+KAHOOT_JOIN_URL = "https://kahoot.it/rest/join"
+
+def bot_join_game(pin: str, nickname: str) -> requests.Response:
+    headers = {
+        "User-Agent": random_user_agent(),
+        "Content-Type": "application/json",
+        "Accept": "*/*"
+    }
+    payload = {"gamePin": pin, "nickname": nickname}
+    return requests.post(KAHOOT_JOIN_URL, json=payload, headers=headers, timeout=10)
+
+
+# ------------------------------------------------------------------
+# Main Kivy widget
+# ------------------------------------------------------------------
+class MainScreen(BoxLayout):
+    game_pin = StringProperty("")
+    num_bots = NumericProperty(0)
+    button_text = StringProperty("START")
+    status_msg = StringProperty("Enter a pin and number of bots.")
+
+    def start_bots(self, *args) -> None:
+        self.game_pin = self.ids.pin_input.text.strip()
+        try:
+            self.num_bots = int(self.ids.bots_input.text)
+        except ValueError:  # pragma: no cover
+            self.status_msg = "⚠️ Number of bots must be an integer."
+            return
+
+        if not (self.game_pin.isdigit() and len(self.game_pin) == 6):
+            self.status_msg = "⚠️ Game PIN must be a 6‑digit number."
+            return
+
+        if self.num_bots <= 0:
+            self.status_msg = "⚠️ Enter at least one bot."
+            return
+
+        # Disable button while bots are spawned
+        self.button_text = "LOADING..."
+        Clock.schedule_once(self._spawn_bots, 0.1)
+
+    def _spawn_bots(self, dt) -> None:
+        self.status_msg = f"⏳ Spawning {self.num_bots} bot(s)..."
+        self.bot_counter = 0
+        Clock.schedule_interval(self._spawn_one_bot, 0.5)
+
+    def _spawn_one_bot(self, dt) -> bool:
+        if self.bot_counter >= self.num_bots:
+            self.button_text = "START"
+            self.status_msg = f"✅ Done! {self.num_bots} bot(s) joined."
+            return False
+
+        nickname = random_nickname()
+        try:
+            resp = bot_join_game(self.game_pin, nickname)
+            if resp.status_code == 200:
+                self.status_msg += f"\n✅ {nickname} joined (#{self.bot_counter+1})."
+            else:
+                self.status_msg += f"\n❌ {nickname} failed: {resp.text}"
+        except Exception as exc:  # pragma: no cover
+            self.status_msg += f"\n⚠️ Error with {nickname}: {exc}"
+
+        self.bot_counter += 1
+        return True
+
+
+# ------------------------------------------------------------------
+# App class
+# ------------------------------------------------------------------
+class KahootBotApp(App):
+    title = "Kahoot Bot"
+
+    def build(self) -> MainScreen:
+        Builder.load_string(KV)
+        return MainScreen()
+
+
+if __name__ == "__main__":
+    KahootBotApp().run()
