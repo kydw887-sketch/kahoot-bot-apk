@@ -6,12 +6,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fix Missing Library
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libncurses5 libtinfo5 || echo "Trying alternative"
-          sudo apt-get install -y libncurses6
-
       - name: Build with Buildozer
         uses: digreatbrian/buildozer-action@v2
         with:
