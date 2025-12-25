@@ -15,3 +15,6 @@ jobs:
         uses: digreatbrian/buildozer-action@v2
         with:
           buildozer_version: stable
+        env:
+          # זה השלב שפותר את השגיאה מהתמונה האחרונה
+          ANDROID_SDK_TOOLS_REV: "34.0.0"
